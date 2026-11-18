@@ -74,6 +74,7 @@ No modules.
 | ---- | ---- |
 | [google_monitoring_alert_policy.log_match](https://registry.terraform.io/providers/hashicorp/google/latest/docs/resources/monitoring_alert_policy) | resource |
 | [google_monitoring_alert_policy.threshold](https://registry.terraform.io/providers/hashicorp/google/latest/docs/resources/monitoring_alert_policy) | resource |
+| [google_monitoring_alert_policy.uptime](https://registry.terraform.io/providers/hashicorp/google/latest/docs/resources/monitoring_alert_policy) | resource |
 | [google_monitoring_dashboard.main](https://registry.terraform.io/providers/hashicorp/google/latest/docs/resources/monitoring_dashboard) | resource |
 | [google_monitoring_notification_channel.main](https://registry.terraform.io/providers/hashicorp/google/latest/docs/resources/monitoring_notification_channel) | resource |
 | [google_monitoring_uptime_check_config.main](https://registry.terraform.io/providers/hashicorp/google/latest/docs/resources/monitoring_uptime_check_config) | resource |
@@ -89,7 +90,7 @@ No modules.
 | <a name="input_labels"></a> [labels](#input\_labels) | User labels applied to notification channels, alert policies and uptime checks | `map(string)` | `{}` | no |
 | <a name="input_notification_channel_sensitive_labels"></a> [notification\_channel\_sensitive\_labels](#input\_notification\_channel\_sensitive\_labels) | Credentials for notification channels with has\_sensitive\_labels = true, keyed by the same key as var.notification\_channels | <pre>map(object({<br/>    auth_token  = optional(string)<br/>    password    = optional(string)<br/>    service_key = optional(string)<br/>  }))</pre> | `{}` | no |
 | <a name="input_notification_channels"></a> [notification\_channels](#input\_notification\_channels) | Map of notification channels to create. type is email (labels.email\_address), pubsub (labels.topic, a full<br/>projects/P/topics/T ID), webhook\_tokenauth (labels.url) or webhook\_basicauth (labels.url, labels.username).<br/>Set has\_sensitive\_labels to read credentials for the channel from var.notification\_channel\_sensitive\_labels. | <pre>map(object({<br/>    type                 = string<br/>    display_name         = string<br/>    description          = optional(string)<br/>    labels               = map(string)<br/>    enabled              = optional(bool, true)<br/>    has_sensitive_labels = optional(bool, false)<br/>  }))</pre> | `{}` | no |
-| <a name="input_uptime_checks"></a> [uptime\_checks](#input\_uptime\_checks) | Map of HTTPS uptime checks against public hosts. SSL is always used and the certificate is always validated | <pre>map(object({<br/>    display_name     = string<br/>    host             = string<br/>    path             = optional(string, "/")<br/>    port             = optional(number, 443)<br/>    timeout          = optional(string, "10s")<br/>    period           = optional(string, "60s")<br/>    selected_regions = optional(list(string))<br/>    content_matchers = optional(list(object({<br/>      content = string<br/>      matcher = optional(string, "CONTAINS_STRING")<br/>    })), [])<br/>  }))</pre> | `{}` | no |
+| <a name="input_uptime_checks"></a> [uptime\_checks](#input\_uptime\_checks) | Map of HTTPS uptime checks against public hosts. SSL is always used and the certificate is always validated. Set notification\_channels (keys of var.notification\_channels or full channel IDs) to create an alert policy that fires when the check fails; without it the check alerts nobody | <pre>map(object({<br/>    display_name     = string<br/>    host             = string<br/>    path             = optional(string, "/")<br/>    port             = optional(number, 443)<br/>    timeout          = optional(string, "10s")<br/>    period           = optional(string, "60s")<br/>    selected_regions = optional(list(string))<br/>    content_matchers = optional(list(object({<br/>      content = string<br/>      matcher = optional(string, "CONTAINS_STRING")<br/>    })), [])<br/>    notification_channels = optional(list(string), [])<br/>  }))</pre> | `{}` | no |
 
 ## Outputs
 
@@ -98,6 +99,7 @@ No modules.
 | <a name="output_alert_policy_ids"></a> [alert\_policy\_ids](#output\_alert\_policy\_ids) | Map of alert policy key to alert policy ID |
 | <a name="output_dashboard_id"></a> [dashboard\_id](#output\_dashboard\_id) | ID of the dashboard, or null when var.dashboard\_json is not set |
 | <a name="output_notification_channel_ids"></a> [notification\_channel\_ids](#output\_notification\_channel\_ids) | Map of notification channel key to channel ID |
+| <a name="output_uptime_alert_policy_ids"></a> [uptime\_alert\_policy\_ids](#output\_uptime\_alert\_policy\_ids) | Map of uptime check key to the ID of the alert policy that fires when that check fails |
 | <a name="output_uptime_check_ids"></a> [uptime\_check\_ids](#output\_uptime\_check\_ids) | Map of uptime check key to uptime check ID |
 <!-- END OF PRE-COMMIT-TERRAFORM DOCS HOOK -->
 

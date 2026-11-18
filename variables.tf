@@ -32,6 +32,16 @@ variable "notification_channels" {
     ])
     error_message = "var.notification_channels labels must match the type: email needs a valid email_address, pubsub a projects/P/topics/T topic, webhooks an https:// url"
   }
+
+  validation {
+    condition     = alltrue([for v in values(var.notification_channels) : length(setintersection(keys(v.labels), ["password", "auth_token", "service_key"])) == 0])
+    error_message = "var.notification_channels labels must not contain password, auth_token or service_key; pass credentials through var.notification_channel_sensitive_labels with has_sensitive_labels = true so they are not stored as plain labels"
+  }
+
+  validation {
+    condition     = alltrue([for v in values(var.notification_channels) : v.type != "webhook_basicauth" || (v.has_sensitive_labels && length(trimspace(lookup(v.labels, "username", ""))) > 0)])
+    error_message = "var.notification_channels webhook_basicauth channels need labels.username and has_sensitive_labels = true (password in var.notification_channel_sensitive_labels)"
+  }
 }
 
 variable "notification_channel_sensitive_labels" {
@@ -144,8 +154,9 @@ variable "uptime_checks" {
       content = string
       matcher = optional(string, "CONTAINS_STRING")
     })), [])
+    notification_channels = optional(list(string), [])
   }))
-  description = "Map of HTTPS uptime checks against public hosts. SSL is always used and the certificate is always validated"
+  description = "Map of HTTPS uptime checks against public hosts. SSL is always used and the certificate is always validated. Set notification_channels (keys of var.notification_channels or full channel IDs) to create an alert policy that fires when the check fails; without it the check alerts nobody"
   default     = {}
 
   validation {
@@ -163,6 +174,11 @@ variable "uptime_checks" {
       ["CONTAINS_STRING", "NOT_CONTAINS_STRING", "MATCHES_REGEX", "NOT_MATCHES_REGEX"], m.matcher
     )]]))
     error_message = "var.uptime_checks content_matchers must have non-empty content and a matcher of CONTAINS_STRING, NOT_CONTAINS_STRING, MATCHES_REGEX or NOT_MATCHES_REGEX"
+  }
+
+  validation {
+    condition     = alltrue(flatten([for v in values(var.uptime_checks) : [for c in v.notification_channels : length(trimspace(c)) > 0]]))
+    error_message = "var.uptime_checks notification_channels entries must be non-empty"
   }
 }
 

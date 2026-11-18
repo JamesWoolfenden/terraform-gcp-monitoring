@@ -31,4 +31,11 @@ resource "google_monitoring_alert_policy" "log_match" {
       label_extractors = each.value.conditions[0].condition_matched_log.label_extractors
     }
   }
+
+  lifecycle {
+    precondition {
+      condition     = length(local.unresolved_channel_refs) == 0
+      error_message = "notification_channels entries must be keys of var.notification_channels or full projects/P/notificationChannels/ID values; unresolved: ${join(", ", local.unresolved_channel_refs)}"
+    }
+  }
 }

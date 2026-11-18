@@ -1,0 +1,106 @@
+{
+  "scan_date": "2026-11-18T00:00:00Z",
+  "scan_path": ".",
+  "category": "all",
+  "findings": [
+    {
+      "status": "fixed",
+      "first_seen": "2026-11-18",
+      "last_seen": "2026-11-18",
+      "unresolved_since": null,
+      "suppression_reason": null,
+      "id": "HOLDEN_AI_001",
+      "principle": "data-protection",
+      "severity": "MEDIUM",
+      "confidence": "high",
+      "title": "Notification channel credentials can be passed as plain labels, and webhook_basicauth channels are accepted without a password path",
+      "file": "variables.tf",
+      "line": 1,
+      "resource": "variable.notification_channels",
+      "related_resources": [
+        "google_monitoring_notification_channel.main",
+        "variable.notification_channel_sensitive_labels"
+      ],
+      "explanation": "The module offers var.notification_channel_sensitive_labels (marked sensitive) for credentials, but nothing stops a caller putting password, auth_token or service_key straight into labels, which are non-sensitive: the secret then shows in plan output, sits unmasked in state and is readable through the channel's labels by anyone with notificationChannels.get. A webhook_basicauth channel with has_sensitive_labels = false is also accepted, which pushes callers toward exactly that. No built-in policy covers google_monitoring_notification_channel.",
+      "remediation": "Reject credential keys in labels and require webhook_basicauth channels to set labels.username and has_sensitive_labels = true.",
+      "fixable": true,
+      "fix": "validation {\n  condition     = alltrue([for v in values(var.notification_channels) : length(setintersection(keys(v.labels), [\"password\", \"auth_token\", \"service_key\"])) == 0])\n  error_message = \"...\"\n}"
+    },
+    {
+      "status": "fixed",
+      "first_seen": "2026-11-18",
+      "last_seen": "2026-11-18",
+      "unresolved_since": null,
+      "suppression_reason": null,
+      "id": "HOLDEN_AI_002",
+      "principle": "reliability",
+      "severity": "MEDIUM",
+      "confidence": "high",
+      "title": "Pub/Sub publisher grant to the monitoring notification service agent can run before the agent exists",
+      "file": "google_pubsub_topic_iam_member.notification_publisher.tf",
+      "line": 2,
+      "resource": "google_pubsub_topic_iam_member.notification_publisher",
+      "related_resources": [
+        "google_monitoring_notification_channel.main"
+      ],
+      "explanation": "Cloud Monitoring only creates service-<number>@gcp-sa-monitoring-notification when the project's first Pub/Sub notification channel is created. The grant builds that member from the project number alone, so it has no dependency on the channel and Terraform may create it first (or in parallel), failing the first apply with a non-existent service account. Best-fit principle: apply-time correctness (deferred service-agent creation).",
+      "remediation": "Add depends_on = [google_monitoring_notification_channel.main] to the grant.",
+      "fixable": true,
+      "fix": "depends_on = [google_monitoring_notification_channel.main]"
+    },
+    {
+      "status": "fixed",
+      "first_seen": "2026-11-18",
+      "last_seen": "2026-11-18",
+      "unresolved_since": null,
+      "suppression_reason": null,
+      "id": "HOLDEN_AI_003",
+      "principle": "reliability",
+      "severity": "LOW",
+      "confidence": "high",
+      "title": "A mistyped notification channel key is silently passed through try() as a channel ID and fails only at apply",
+      "file": "locals.tf",
+      "line": 1,
+      "resource": "local.alert_policy_channels",
+      "related_resources": [
+        "google_monitoring_alert_policy.threshold",
+        "google_monitoring_alert_policy.log_match"
+      ],
+      "explanation": "alert_policy_channels used try(google_monitoring_notification_channel.main[c].id, c): any value that is not a channel key, including a typo of one, falls through as if it were a full channel ID. Plan shows the bare string and apply fails with an invalid channel name (or, worse, a policy that routes nowhere useful). Best-fit principle: apply-time correctness.",
+      "remediation": "Resolve keys with lookup() and add a precondition that every reference is a known key or a full projects/P/notificationChannels/ID.",
+      "fixable": true,
+      "fix": "unresolved_channel_refs = [for c in local.channel_refs : c if !contains(keys(var.notification_channels), c) && !can(regex(\"^projects/[^/]+/notificationChannels/[^/]+$\", c))]"
+    },
+    {
+      "status": "fixed",
+      "first_seen": "2026-11-18",
+      "last_seen": "2026-11-18",
+      "unresolved_since": null,
+      "suppression_reason": null,
+      "id": "HOLDEN_AI_004",
+      "principle": "logging-and-monitoring",
+      "severity": "LOW",
+      "confidence": "high",
+      "title": "Uptime checks are created with no way to alert on failure; the example's homepage check pages nobody",
+      "file": "google_monitoring_uptime_check_config.main.tf",
+      "line": 1,
+      "resource": "google_monitoring_uptime_check_config.main",
+      "related_resources": [
+        "module.monitoring (example/examplea/module.monitoring.tf)"
+      ],
+      "explanation": "An uptime check only records check_passed; someone is told it failed only through an alert policy on that metric filtered by the check's generated check_id. var.uptime_checks had no channel field and the check_id is only known after apply, so neither the module nor the example wired an alert, and the example's failing homepage would go unnoticed.",
+      "remediation": "Add an optional notification_channels list per uptime check and create the standard check_passed alert policy (REDUCE_COUNT_FALSE over 1200s, threshold > 1) for checks that set it; wire it in the example.",
+      "fixable": false
+    }
+  ],
+  "suggested_policies": [
+    {
+      "rationale": "No built-in policy covers google_monitoring_notification_channel. Credentials in labels instead of sensitive_labels is a single map-key check that applies to any Terraform creating notification channels, and the module now enforces it in validation.",
+      "yaml": "id: LOCAL_GCP_001\nname: Notification channel credentials must be set in sensitive_labels, not labels\nprinciple: data-protection\nseverity: HIGH\nrationale: |\n  google_monitoring_notification_channel labels are plain, non-sensitive attributes:\n  a password, auth_token or service_key put there is shown in plan output, stored\n  unmasked in state and readable by anyone with monitoring.notificationChannels.get.\n  sensitive_labels exists so the API and provider treat these values as secrets.\nmessage: |\n  google_monitoring_notification_channel sets a password, auth_token or service_key in labels.\nremediation: |\n  Move the credential into a sensitive_labels block fed from a sensitive variable or\n  secret, and remove it from labels.\nresources:\n  google_monitoring_notification_channel:\n    path: labels\n    no_key_matches: \"^(password|auth_token|service_key)$\"\n",
+      "status": "installed",
+      "first_seen": "2026-11-18",
+      "last_seen": "2026-11-18"
+    }
+  ],
+  "suggested_suppressions": []
+}

@@ -45,6 +45,8 @@ module "monitoring" {
     homepage = {
       display_name = "Homepage HTTPS"
       host         = var.uptime_host
+      # Page on-call when the check fails, not just record it.
+      notification_channels = ["oncall"]
       content_matchers = [{
         content = "Example Domain"
       }]

@@ -10,6 +10,12 @@ output "alert_policy_ids" {
   description = "Map of alert policy key to alert policy ID"
 }
 
+# holden:ignore:HLD_TF_080 — only the resource ID is output; IDs are not derived from sensitive_labels and are not marked sensitive by the provider
+output "uptime_alert_policy_ids" {
+  value       = { for k, v in google_monitoring_alert_policy.uptime : k => v.id }
+  description = "Map of uptime check key to the ID of the alert policy that fires when that check fails"
+}
+
 output "uptime_check_ids" {
   value       = { for k, v in google_monitoring_uptime_check_config.main : k => v.uptime_check_id }
   description = "Map of uptime check key to uptime check ID"
